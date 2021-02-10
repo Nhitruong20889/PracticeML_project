@@ -1,0 +1,119 @@
+---
+title: "Practical Machine Learning-project"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+# Loading libraries
+# Please install libraries if they are not installed/vailable in your R
+
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(rpart)
+library("rpart.plot")
+library(knitr)
+library(corrplot)
+library(plotly)
+library(randomForest)
+```
+
+# Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively.
+
+In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants (20 - 28 years old) who were asked to perform barbell lifts correctly and incorrectly in 5 different ways.  
+
+The set of performances was 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: correct class_ exactly according to the specification (Class A), and 4 other classes corresponding to common mistakes including throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). 
+
+The goal here is to predict the *"class"* with the help of other predictors. This project is a part of Coursera Practical Machine Learning Week 4 - Peer-graded Assignment: Prediction Assignment Writeup.  
+
+# Data
+## Loading Data
+ALl necessary data (training/testing) were downloaded and save into my local system: destop/PracticeML-data
+
+```{r}
+setwd("~/Desktop/PracticeML-data")
+
+d_train <- read.csv("~/Desktop/PracticeML-data/pml-training.csv", stringsAsFactors = F,na.strings = c("","NA","#DIV/0!"), header = TRUE)
+d_test <- read.csv("~/Desktop/PracticeML-data/pml-testing.csv", stringsAsFactors = F,na.strings = c("","NA","#DIV/0!"), header = TRUE)
+
+dim(d_train)
+dim(d_test)
+```
+The training data set contains 19622 observations and 160 variables, while the testing data set contains 20 observations and 160 variables. The "classe" variable in the training set is the outcome to predict. 
+
+## Data cleaning
+```{r, cache=TRUE}
+d_train<-d_train[,colSums(is.na(d_train)) == 0]
+d_test <-d_test[,colSums(is.na(d_test)) == 0]
+
+# Subset data
+d_train   <-d_train[,-c(1:7)]
+d_test <-d_test[,-c(1:7)]
+dim(d_train)
+dim(d_test)
+```
+Now, the cleaned training data set contains 19622 observations and 53 variables, while the testing data set contains 20 observations and 53 variables. The "classe" variable is still in the cleaned training set.
+
+## Slice data/Cross-validation
+```{r}
+# Set seed for reproducability
+set.seed(7878)
+
+# cross validation
+crval <- caret::createDataPartition(d_train$classe, p = 0.8, list = F)
+d_val <- d_train[-crval,]
+d_train <- d_train[crval,]
+dim(d_train); dim(d_val)
+
+```
+# Modeling
+# ML Algorithm_ Decision tree
+Predict with decision tree and output the confusion matrix. It seems like the result of the model is not ideal since the accuracy is 72.5%.
+
+```{r, echo=TRUE}
+# Fit model
+modFitDT <- rpart(classe ~ ., data=d_train, method="class")
+# Perform prediction
+predictDT <- predict(modFitDT, d_val, type = "class")
+table(d_val$classe, predictDT)
+```
+
+```{r decisiontreecm, echo=TRUE}
+confusionMatrix(table(d_val$classe, predictDT))
+
+```
+## ML Algorithm_ Random forest
+```{r}
+modFitRF <- randomForest(as.factor(classe) ~ ., data=d_train, method="class")
+predictRF <- predict(modFitRF, d_val, type = "class")
+
+```
+
+Following confusion matrix shows the errors of the prediction algorithm.
+
+```{r randomforestcm, echo=TRUE}
+confusionMatrix(table(d_val$classe, predictRF))
+
+```
+So, the estimated accuracy of the model is 99.54%.
+
+## Predicting on Test dataset
+```{r, cache=T}
+result <- predict(modFitRF, d_test[, -length(names(d_test))])
+result
+```
+# Conclusion
+## Result: 
+The confusion matrices show, that the Random Forest algorithm performens better than decision trees. The accuracy for the Random Forest model was 0.9954 (95% CI : (0.9928, 0.9973)) compared to 0.725 (95% CI : (0.7107, 0.7389)) for Decision Tree model. The random Forest model is choosen.
+
+## Appendix: Figures
+```{r}
+# Plot result_ Decision tree 
+rpart.plot(modFitDT)
+# Plot Correlation Matrix
+corrPlot <- cor(d_train[, -length(names(d_train))])
+corrplot(corrPlot, method="color")
+```
